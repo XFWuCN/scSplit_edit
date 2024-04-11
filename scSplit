@@ -92,8 +92,8 @@ class models:
         self.assigned, self.reassigned = [], []
         self.convergence = 0
         for _ in range(self.num):
-            self.assigned.append([])
-            self.reassigned.append([])
+            self.assigned.concat([])
+            self.reassigned.concat([])
         self.model_af = pd.DataFrame(0, index=self.all_POS, columns=range(self.num))
         self.pseudo = 1
 
@@ -136,10 +136,10 @@ class models:
             # initialise allele frequency for model states
             self.initial = []
             for n in range(self.num):
-                self.initial.append([])
+                self.initial.concat([])
                 for index, col in enumerate(icols):
                     if kmeans.labels_[index] == n:
-                        self.initial[n].append(self.barcodes[col])
+                        self.initial[n].concat(self.barcodes[col])
                 barcode_alt = np.array(self.alt_bc_mtx[:, icols[kmeans.labels_==n]].sum(axis=1))
                 barcode_ref = np.array(self.ref_bc_mtx[:, icols[kmeans.labels_==n]].sum(axis=1))
                 self.model_af.loc[:, n] = (barcode_alt + self.k_alt) / (barcode_alt + barcode_ref + self.pseudo)
@@ -158,7 +158,7 @@ class models:
             with open(os.path.join(output, r'scSplit.log'), 'a') as logfile: logfile.write('E-M Iteration ' + str(iterations) + '   ' + str(datetime.datetime.now()) + '\n')
             self.calculate_cell_likelihood()
             self.calculate_model_af()
-            self.sum_log_likelihood.append(self.lP_c_m)
+            self.sum_log_likelihood.concat(self.lP_c_m)
         if iterations < 300: self.convergence = 1
 
 
@@ -217,7 +217,7 @@ class models:
                 index = []
                 # transform barcode assignments to indices
                 for item in self.assigned[j]:
-                    index.append(self.barcodes.index(item))
+                    index.concat(self.barcodes.index(item))
                 matcalc = self.alt_bc_mtx.T.multiply(self.model_af.loc[:, i].apply(np.log2)).T \
                         + self.ref_bc_mtx.T.multiply((1 - self.model_af.loc[:, i]).apply(np.log2)).T
                 cross_state.loc[j, i] = matcalc[:, index].sum()
@@ -295,7 +295,7 @@ class models:
                     unq = np.unique(patt, return_inverse=True)                  
                     for j in range(len(unq[0])):
                         # first informative alleles for each unique pattern in the cluster screen which has maximum non-NA values in original information matrix
-                        selected.append(alt_or_ref.loc[informative_sub.iloc[[i for i, x in enumerate(unq[1]) if x == j]].index].count(axis=1).idxmax())
+                        selected.concat(alt_or_ref.loc[informative_sub.iloc[[i for i, x in enumerate(unq[1]) if x == j]].index].count(axis=1).idxmax())
                     subt = submatrix.reindex(np.unique(selected)).iloc[:, 0:ncols]
                     subt[subt.isna()]=-1
                     d = np.linalg.svd(subt, full_matrices=False)[1]
@@ -449,10 +449,10 @@ Options:
         barcodes = []   # list of cell barcodes
         if args.bar.endswith('.gz'):
             for line in gzip.open(args.bar, 'rt'):
-                barcodes.append(line.strip())
+                barcodes.concat(line.strip())
         else:         
             for line in open(args.bar, 'r'):
-                barcodes.append(line.strip())
+                barcodes.concat(line.strip())
 
         base_calls_mtx = mixed_VCF().build_base_calls_matrix(args.bam, filtered_vcf, barcodes, args.tag, args.out)
         
@@ -551,8 +551,8 @@ Options:
             all_models, LL = [], []
             for sub in range(2, args.sub + 1):
                 model = core(sub, args.out)
-                all_models.append(model)
-                LL.append(model.lP_c_s.max(axis=1).sum())
+                all_models.concat(model)
+                LL.concat(model.lP_c_s.max(axis=1).sum())
             elb = elbow(LL)
             model = all_models[elb]
             num = elb + 2
@@ -568,7 +568,7 @@ Options:
                 # only keep high R2 variants
                 try:
                     if float(record.INFO['R2'][0]) > 0.9:
-                        pos.append(model.all_POS.index(str(record.CHROM)+':'+str(record.POS)))
+                        pos.concat(model.all_POS.index(str(record.CHROM)+':'+str(record.POS)))
                 except:
                     continue
         except:
@@ -585,12 +585,12 @@ Options:
             assignment['Barcode'] = model.reassigned[n]
             if n != model.doublet:
                 assignment['Cluster'] = 'SNG-' + str(n)
-                assignments = assignments.append(assignment)
+                assignments = assignments.concat(assignment)
         if doublets != 0:   # if doublet cluster is expected
             assignment = pd.DataFrame()
             assignment['Barcode'] = model.reassigned[model.doublet]
             assignment['Cluster'] = 'DBL-' + str(model.doublet)
-            assignments = assignments.append(assignment)
+            assignments = assignments.concat(assignment)
         assignments.to_csv(os.path.join(args.out, r'scSplit_result.csv'), sep='\t', index=False)
         model.P_s_c.to_csv(os.path.join(args.out, r'scSplit_P_s_c.csv'))
         with open(os.path.join(args.out, r'scSplit_dist_variants.txt'), 'w') as logfile:
